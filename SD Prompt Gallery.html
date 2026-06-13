@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SD Prompt Gallery</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0f0f13;--surface:#1a1a24;--surface2:#24243a;--border:#2e2e48;
+    --text:#e8e8f0;--text2:#9999bb;--accent:#7c5cfc;--accent2:#c084fc;
+    --danger:#f43f5e;--success:#22c55e;--radius:12px;
+  }
+  body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+  ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+  .header{position:sticky;top:0;z-index:100;background:rgba(15,15,19,.88);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:14px 28px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .logo{font-size:21px;font-weight:700;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;white-space:nowrap;letter-spacing:-.5px}
+  .logo span{font-size:12px;-webkit-text-fill-color:var(--text2);margin-left:6px;font-weight:400}
+  .folder-badge{font-size:11px;background:var(--surface2);color:var(--accent2);padding:5px 11px;border-radius:7px;cursor:pointer;border:1px solid var(--border);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:border .2s;flex-shrink:0}
+  .folder-badge:hover{border-color:var(--accent)}
+  .search-box{flex:1;min-width:180px;position:relative}
+  .search-box input{width:100%;padding:9px 14px 9px 36px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;outline:none;transition:border .2s}
+  .search-box input:focus{border-color:var(--accent)}
+  .search-box svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text2)}
+  .header-actions{display:flex;gap:7px;align-items:center}
+  .btn{padding:8px 16px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:600;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+  .btn-primary{background:linear-gradient(135deg,var(--accent),#6d28d9);color:#fff}
+  .btn-primary:hover{filter:brightness(1.15);transform:translateY(-1px)}
+  .btn-ghost{background:var(--surface);color:var(--text2);border:1px solid var(--border)}
+  .btn-ghost:hover{border-color:var(--accent);color:var(--text)}
+  .btn-sm{padding:6px 12px;font-size:12px}
+
+  .tags-bar{padding:10px 28px;display:flex;gap:7px;flex-wrap:wrap;border-bottom:1px solid var(--border);background:rgba(15,15,19,.5)}
+  .tag-chip{padding:4px 12px;border-radius:18px;font-size:12px;cursor:pointer;transition:all .15s;border:1px solid var(--border);background:var(--surface);color:var(--text2);user-select:none}
+  .tag-chip:hover,.tag-chip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+  .stats{padding:8px 28px;font-size:12px;color:var(--text2);display:flex;justify-content:space-between}
+
+  .gallery{padding:18px 28px;display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:18px;padding-bottom:40px}
+  .card{background:var(--surface);border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);transition:all .2s;position:relative}
+  .card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 30px rgba(124,92,252,.12)}
+  .card-img-wrap{width:100%;aspect-ratio:1;background:#12121a;cursor:pointer;position:relative;overflow:hidden}
+  .card-img-wrap img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .3s}
+  .card:hover .card-img-wrap img{transform:scale(1.03)}
+  .card-img-wrap .no-img{display:flex;align-items:center;justify-content:center;width:100%;height:100%;color:var(--text2);font-size:13px}
+  .card-body{padding:12px 14px}
+  .card-title{font-size:14px;font-weight:600;margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .card-prompt{font-size:12px;color:var(--text2);line-height:1.5;max-height:54px;overflow:hidden;position:relative;margin-bottom:6px;word-break:break-all}
+  .card-prompt::after{content:'';position:absolute;bottom:0;left:0;right:0;height:18px;background:linear-gradient(transparent,var(--surface))}
+  .card-tags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px}
+  .mini-tag{font-size:10px;padding:2px 7px;border-radius:10px;background:var(--surface2);color:var(--accent2);border:1px solid rgba(124,92,252,.15)}
+  .card-actions{display:flex;gap:5px;justify-content:flex-end}
+  .card-actions button{width:28px;height:28px;font-size:13px;background:var(--surface2);color:var(--text2);border:none;cursor:pointer;border-radius:6px;display:flex;align-items:center;justify-content:center;transition:color .15s}
+  .card-actions button:hover{color:var(--accent)}
+  .card-actions .del:hover{color:var(--danger)}
+  .card-date{font-size:10px;color:var(--text2);position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);padding:2px 7px;border-radius:5px;backdrop-filter:blur(4px)}
+  .card-note{font-size:10px;color:var(--text2);padding:4px 8px;background:var(--surface2);border-radius:5px;margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  /* Setup */
+  .setup{display:flex;align-items:center;justify-content:center;min-height:80vh;padding:20px}
+  .setup-box{text-align:center;max-width:500px}
+  .setup-box .setup-icon{font-size:68px;margin-bottom:18px;opacity:.35}
+  .setup-box h2{font-size:22px;margin-bottom:10px}
+  .setup-box p{color:var(--text2);font-size:14px;line-height:1.7;margin-bottom:24px}
+  .setup-box .hint{font-size:12px;color:var(--text2);margin-top:16px;line-height:1.7;text-align:left;background:var(--surface);padding:14px 18px;border-radius:10px;border:1px solid var(--border)}
+  .setup-box .hint strong{color:var(--text)}
+  .setup-box .hint code{background:var(--surface2);padding:1px 5px;border-radius:3px;font-size:11px}
+  .setup-box .error-msg{color:var(--danger);font-size:13px;margin-top:12px;display:none}
+  .reconnect-btn{font-size:15px!important;padding:12px 32px!important;animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(124,92,252,.4)}50%{box-shadow:0 0 0 10px rgba(124,92,252,0)}}
+
+  /* Modal */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);z-index:200;display:none;align-items:center;justify-content:center;padding:20px}
+  .modal-overlay.show{display:flex}
+  .modal{background:var(--surface);border-radius:14px;border:1px solid var(--border);width:100%;max-width:580px;max-height:90vh;overflow-y:auto;animation:mIn .2s}
+  @keyframes mIn{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}
+  .modal-header{padding:18px 22px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+  .modal-header h2{font-size:17px;font-weight:600}
+  .modal-close{background:none;border:none;color:var(--text2);font-size:22px;cursor:pointer;padding:4px}
+  .modal-close:hover{color:var(--text)}
+  .modal-body{padding:18px 22px;display:flex;flex-direction:column;gap:14px}
+  .form-group{display:flex;flex-direction:column;gap:5px}
+  .form-group label{font-size:12px;font-weight:600;color:var(--text2)}
+  .form-group input,.form-group textarea{padding:9px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;outline:none;resize:vertical;font-family:inherit;transition:border .2s}
+  .form-group input:focus,.form-group textarea:focus{border-color:var(--accent)}
+  .form-group textarea{min-height:72px}
+  .form-group .hint{font-size:11px;color:var(--text2)}
+  .img-upload-area{border:2px dashed var(--border);border-radius:10px;padding:28px;text-align:center;cursor:pointer;transition:all .2s;min-height:140px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;overflow:hidden}
+  .img-upload-area:hover{border-color:var(--accent);background:rgba(124,92,252,.03)}
+  .img-upload-area.has-image{padding:8px;border-style:solid}
+  .img-upload-area img{max-width:100%;max-height:280px;border-radius:6px;object-fit:contain}
+  .img-upload-area .upload-text{color:var(--text2);font-size:13px}
+  .img-upload-area .upload-icon{font-size:28px;color:var(--text2)}
+  .modal-footer{padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
+
+  .lightbox{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:300;display:none;align-items:center;justify-content:center;cursor:zoom-out}
+  .lightbox.show{display:flex}
+  .lightbox img{max-width:92vw;max-height:92vh;object-fit:contain;border-radius:6px}
+  .lightbox .lb-info{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);background:rgba(26,26,36,.92);padding:10px 18px;border-radius:9px;max-width:80vw;font-size:12px;color:var(--text2);backdrop-filter:blur(10px);border:1px solid var(--border);line-height:1.6;max-height:40vh;overflow-y:auto}
+  .lightbox .lb-close{position:absolute;top:14px;right:18px;background:none;border:none;color:#fff;font-size:26px;cursor:pointer}
+
+  .empty-state{grid-column:1/-1;text-align:center;padding:70px 20px;color:var(--text2)}
+  .empty-state .empty-icon{font-size:56px;margin-bottom:14px;opacity:.3}
+  .empty-state h3{font-size:18px;margin-bottom:6px;color:var(--text)}
+  .empty-state p{font-size:13px}
+
+  .toast{position:fixed;bottom:24px;right:24px;background:var(--surface2);color:var(--text);padding:11px 18px;border-radius:9px;border:1px solid var(--border);font-size:13px;z-index:999;animation:tIn .3s;display:flex;align-items:center;gap:7px;box-shadow:0 8px 28px rgba(0,0,0,.3)}
+  .toast.success{border-color:var(--success)}.toast.error{border-color:var(--danger)}
+  @keyframes tIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+  .loading-overlay{position:fixed;inset:0;background:rgba(15,15,19,.5);z-index:500;display:flex;align-items:center;justify-content:center}
+  .loading-overlay .spinner{width:34px;height:34px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .65s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  @media(max-width:768px){.header,.tags-bar,.gallery,.stats{padding-left:14px;padding-right:14px}.gallery{grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}}
+</style>
+</head>
+<body>
+
+<!-- Setup Screen -->
+<div class="setup" id="setupScreen" style="display:none">
+  <div class="setup-box" id="setupBoxFirst">
+    <div class="setup-icon">&#128193;</div>
+    <h2>选择存储文件夹</h2>
+    <p>选择一个本地文件夹来存放你的提示词和图片。<br>所有数据将以文件形式保存在该文件夹中，不受浏览器缓存影响。</p>
+    <button class="btn btn-primary" onclick="pickFolder()" style="font-size:15px;padding:12px 32px">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+      选择文件夹
+    </button>
+    <div class="error-msg" id="setupError"></div>
+    <div class="hint">
+      <strong>文件夹结构：</strong>应用会在你选择的文件夹下自动创建 <code>sd_gallery_data/</code> 子目录<br>
+      - <code>index.json</code> — 存储所有提示词元数据<br>
+      - <code>images/</code> — 存放图片原文件（不压缩，保留完整质量）<br><br>
+      <strong>浏览器要求：</strong>请使用 Chrome 或 Edge 打开本应用<br>
+      <strong>数据安全：</strong>图片保存在磁盘上，删除浏览器缓存不会丢失数据
+    </div>
+  </div>
+  <div class="setup-box" id="setupBoxReconnect" style="display:none">
+    <div class="setup-icon">&#128274;</div>
+    <h2>需要重新授权</h2>
+    <p>检测到上次使用的文件夹，但浏览器出于安全策略<br>每次打开页面都需要你点一下按钮重新授权访问权限。<br><span style="font-size:12px;color:var(--accent2)">（这是浏览器的限制，只需点击一次即可进入）</span></p>
+    <button class="btn btn-primary reconnect-btn" onclick="reconnectFolder()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+      继续使用上次的文件夹
+    </button>
+    <div class="error-msg" id="reconnectError"></div>
+    <p style="margin-top:16px;font-size:12px">
+      <a href="#" onclick="showFirstTimeSetup();return false" style="color:var(--accent2);text-decoration:underline">换一个文件夹</a>
+    </p>
+  </div>
+</div>
+
+<!-- Main App -->
+<div id="mainApp" style="display:none">
+  <div class="header">
+    <div class="logo">SD Prompt Gallery<span>提示词管理</span></div>
+    <div class="folder-badge" id="folderBadge" onclick="pickFolder()" title="点击切换存储文件夹"></div>
+    <div class="search-box">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="searchInput" placeholder="搜索提示词、标题、标签..." />
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-ghost btn-sm" onclick="refreshData()" title="从文件夹重新加载">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+        刷新
+      </button>
+      <button class="btn btn-primary" onclick="openAddModal()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        添加
+      </button>
+    </div>
+  </div>
+  <div class="tags-bar" id="tagsBar"></div>
+  <div class="stats" id="statsBar"></div>
+  <div class="gallery" id="gallery"></div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalTitle">添加提示词</h2>
+      <button class="modal-close" onclick="closeAddModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>标题</label>
+        <input type="text" id="entryTitle" placeholder="给这张图起个名字" />
+      </div>
+      <div class="form-group">
+        <label>图片</label>
+        <div class="img-upload-area" id="imgUploadArea" onclick="document.getElementById('imgInput').click()">
+          <div class="upload-icon">&#128444;</div>
+          <div class="upload-text">点击上传图片 (JPG / PNG / WEBP)</div>
+        </div>
+        <input type="file" id="imgInput" accept="image/*" style="display:none" onchange="handleImageUpload(event)"/>
+      </div>
+      <div class="form-group">
+        <label>提示词 (Prompt)</label>
+        <textarea id="entryPrompt" placeholder="masterpiece, best quality, 1girl, ..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>负面提示词 (Negative Prompt)</label>
+        <textarea id="entryNeg" placeholder="lowres, bad anatomy, bad hands, ..." style="min-height:46px"></textarea>
+      </div>
+      <div class="form-group">
+        <label>标签</label>
+        <input type="text" id="entryTags" placeholder="用逗号分隔，如：人物, 二次元, 风景" />
+        <span class="hint">多个标签用逗号分隔</span>
+      </div>
+      <div class="form-group">
+        <label>备注</label>
+        <input type="text" id="entryNote" placeholder="模型名称、采样器、CFG Scale、尺寸等" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeAddModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveEntry()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
+  <button class="lb-close" onclick="closeLightbox(event)">&times;</button>
+  <img id="lbImage" src="" alt=""/>
+  <div class="lb-info" id="lbInfo"></div>
+</div>
+
+<script>
+// ============================================================
+//  State
+// ============================================================
+let dirHandle = null;       // FileSystemDirectoryHandle → sd_gallery_data/
+let imgDirHandle = null;    // FileSystemDirectoryHandle → sd_gallery_data/images/
+let entries = [];
+let editingId = null;
+let pendingImage = null;    // { file: File, dataUrl: string, ext: string }
+let activeTag = null;
+let searchQuery = '';
+
+const DB_NAME  = 'sd_gallery_handle_db';
+const STORE    = 'handles';
+const SUB_DIR  = 'sd_gallery_data';
+
+// ============================================================
+//  IndexedDB — persist the directory handle across sessions
+// ============================================================
+function openDB() {
+  return new Promise((ok, fail) => {
+    const r = indexedDB.open(DB_NAME, 1);
+    r.onupgradeneeded = () => r.result.createObjectStore(STORE);
+    r.onsuccess = () => ok(r.result);
+    r.onerror  = () => fail(r.error);
+  });
+}
+async function persistHandle(h) {
+  const db = await openDB();
+  return new Promise((ok, fail) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).put(h, 'dir');
+    tx.oncomplete = ok;
+    tx.onerror = () => fail(tx.error);
+  });
+}
+async function restoreHandle() {
+  const db = await openDB();
+  return new Promise((ok, fail) => {
+    const tx = db.transaction(STORE, 'readonly');
+    const r = tx.objectStore(STORE).get('dir');
+    r.onsuccess = () => ok(r.result || null);
+    r.onerror = () => fail(r.error);
+  });
+}
+
+// ============================================================
+//  File helpers
+// ============================================================
+async function readJSON(fh) {
+  const f = await fh.getFile();
+  return JSON.parse(await f.text());
+}
+async function writeJSON(fh, obj) {
+  const w = await fh.createWritable();
+  await w.write(JSON.stringify(obj, null, 2));
+  await w.close();
+}
+async function writeBlob(fh, blob) {
+  const w = await fh.createWritable();
+  await w.write(blob);
+  await w.close();
+}
+
+// ============================================================
+//  Init
+// ============================================================
+let savedHandle = null;  // kept for reconnect
+
+async function init() {
+  if (!window.showDirectoryPicker) {
+    showSetup('浏览器不支持 File System Access API。<br>请使用 <strong>Chrome</strong> 或 <strong>Edge</strong> 打开本应用。');
+    return;
+  }
+  // Try restoring saved handle
+  try {
+    const h = await restoreHandle();
+    if (h) {
+      savedHandle = h;
+      const perm = await h.queryPermission({ mode:'readwrite' });
+      if (perm === 'granted') {
+        // Rare: permission still granted (same session)
+        await boot(h); return;
+      }
+      // Permission revoked — show reconnect button (one-click restore)
+      showReconnect();
+      return;
+    }
+  } catch(e) { /* fall through */ }
+  showSetup();
+}
+
+function showSetup(errorMsg) {
+  document.getElementById('setupScreen').style.display = 'flex';
+  document.getElementById('mainApp').style.display = 'none';
+  document.getElementById('setupBoxReconnect').style.display = 'none';
+  document.getElementById('setupBoxFirst').style.display = '';
+  if (errorMsg) {
+    const el = document.getElementById('setupError');
+    el.textContent = errorMsg; el.style.display = 'block';
+  }
+}
+
+function showReconnect() {
+  document.getElementById('setupScreen').style.display = 'flex';
+  document.getElementById('mainApp').style.display = 'none';
+  document.getElementById('setupBoxFirst').style.display = 'none';
+  document.getElementById('setupBoxReconnect').style.display = '';
+}
+
+function showFirstTimeSetup() {
+  savedHandle = null;
+  showSetup();
+}
+
+async function reconnectFolder() {
+  if (!savedHandle) { pickFolder(); return; }
+  try {
+    // This click IS a user gesture, so requestPermission will work
+    const perm = await savedHandle.requestPermission({ mode:'readwrite' });
+    if (perm === 'granted') {
+      await boot(savedHandle);
+      return;
+    }
+  } catch(e) {
+    const el = document.getElementById('reconnectError');
+    el.textContent = '授权失败：' + e.message + '，请尝试重新选择文件夹';
+    el.style.display = 'block';
+    return;
+  }
+  // User denied — fall back to full picker
+  pickFolder();
+}
+
+async function pickFolder() {
+  try {
+    const root = await window.showDirectoryPicker({ mode:'readwrite' });
+    const dir  = await root.getDirectoryHandle(SUB_DIR, { create:true });
+    await persistHandle(dir);
+    await boot(dir);
+  } catch(e) {
+    if (e.name !== 'AbortError') {
+      const el = document.getElementById('setupError');
+      el.textContent = '选择文件夹失败：' + e.message;
+      el.style.display = 'block';
+    }
+  }
+}
+
+async function boot(handle) {
+  dirHandle = handle;
+  imgDirHandle = await handle.getDirectoryHandle('images', { create:true });
+
+  // Ensure index.json exists
+  try {
+    await dirHandle.getFileHandle('index.json');
+  } catch {
+    const fh = await dirHandle.getFileHandle('index.json', { create:true });
+    await writeJSON(fh, []);
+  }
+
+  await loadEntries();
+
+  document.getElementById('setupScreen').style.display = 'none';
+  document.getElementById('mainApp').style.display = '';
+  document.getElementById('folderBadge').textContent = '\u{1F4C1} ' + SUB_DIR;
+  document.getElementById('folderBadge').title = '点击切换存储文件夹';
+  render();
+}
+
+// ============================================================
+//  Data I/O  —  everything reads/writes real files on disk
+// ============================================================
+async function loadEntries() {
+  try {
+    const fh = await dirHandle.getFileHandle('index.json');
+    entries = await readJSON(fh);
+    if (!Array.isArray(entries)) entries = [];
+  } catch { entries = []; }
+}
+
+async function saveIndex() {
+  const fh = await dirHandle.getFileHandle('index.json', { create:true });
+  await writeJSON(fh, entries);
+}
+
+async function saveImageToDisk(id, file, ext) {
+  const name = id + '.' + ext;
+  const fh = await imgDirHandle.getFileHandle(name, { create:true });
+  await writeBlob(fh, file);
+  return name;
+}
+
+async function deleteImageFromDisk(filename) {
+  try { await imgDirHandle.removeEntry(filename); } catch {}
+}
+
+async function getImageBlobURL(filename) {
+  try {
+    const fh = await imgDirHandle.getFileHandle(filename);
+    const file = await fh.getFile();
+    return URL.createObjectURL(file);
+  } catch { return null; }
+}
+
+// ============================================================
+//  Rendering
+// ============================================================
+function allTags() {
+  const s = new Set();
+  entries.forEach(e => (e.tags||[]).forEach(t => s.add(t)));
+  return [...s].sort();
+}
+
+function filtered() {
+  let list = entries;
+  if (activeTag) list = list.filter(e => (e.tags||[]).includes(activeTag));
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    list = list.filter(e =>
+      (e.title||'').toLowerCase().includes(q) ||
+      (e.prompt||'').toLowerCase().includes(q) ||
+      (e.negative||'').toLowerCase().includes(q) ||
+      (e.tags||[]).some(t => t.toLowerCase().includes(q)) ||
+      (e.note||'').toLowerCase().includes(q)
+    );
+  }
+  return list.sort((a,b) => b.created - a.created);
+}
+
+async function render() { renderTags(); renderStats(); await renderGallery(); }
+
+function renderTags() {
+  const tags = allTags();
+  let h = `<span class="tag-chip ${!activeTag?'active':''}" onclick="filterTag(null)">全部</span>`;
+  tags.forEach(t => {
+    const n = entries.filter(e => (e.tags||[]).includes(t)).length;
+    h += `<span class="tag-chip ${activeTag===t?'active':''}" onclick="filterTag('${escA(t)}')">${esc(t)} (${n})</span>`;
+  });
+  document.getElementById('tagsBar').innerHTML = h;
+}
+
+function renderStats() {
+  const f = filtered();
+  document.getElementById('statsBar').innerHTML =
+    `<span>共 ${entries.length} 条${f.length!==entries.length?' · 当前 '+f.length+' 条':''}</span>
+     <span>数据存储在本地文件夹 · 图片原文件保留</span>`;
+}
+
+async function renderGallery() {
+  const gal = document.getElementById('gallery');
+  const list = filtered();
+  if (!list.length) {
+    gal.innerHTML = `<div class="empty-state"><div class="empty-icon">&#127912;</div>
+      <h3>${entries.length?'没有匹配的结果':'还没有任何记录'}</h3>
+      <p>${entries.length?'试试其他关键词或标签':'点击「添加」开始收集你的提示词'}</p></div>`;
+    return;
+  }
+  let h = '';
+  for (const e of list) {
+    const tags = (e.tags||[]).map(t=>`<span class="mini-tag">${esc(t)}</span>`).join('');
+    const dt = new Date(e.created).toLocaleDateString('zh-CN');
+    const note = e.note?`<div class="card-note" title="${escA(e.note)}">${esc(e.note)}</div>`:'';
+    h += `<div class="card">
+      <span class="card-date">${dt}</span>
+      <div class="card-img-wrap" onclick="openLightbox('${e.id}')">
+        ${e.image?`<img data-fn="${escA(e.image)}" src="" loading="lazy" alt=""/>`:'<div class="no-img">无图片</div>'}
+      </div>
+      <div class="card-body">
+        <div class="card-title">${esc(e.title||'无标题')}</div>
+        <div class="card-prompt">${esc(e.prompt||'(无提示词)')}</div>
+        ${tags?`<div class="card-tags">${tags}</div>`:''}
+        ${note}
+        <div class="card-actions">
+          <button onclick="copyPrompt('${e.id}')" title="复制提示词">&#128203;</button>
+          <button onclick="openEditModal('${e.id}')" title="编辑">&#9998;</button>
+          <button class="del" onclick="deleteEntry('${e.id}')" title="删除">&#128465;</button>
+        </div>
+      </div>
+    </div>`;
+  }
+  gal.innerHTML = h;
+  // Load images async
+  gal.querySelectorAll('img[data-fn]').forEach(img => {
+    getImageBlobURL(img.dataset.fn).then(url => { if(url) img.src = url; });
+  });
+}
+
+// ============================================================
+//  Actions
+// ============================================================
+function filterTag(t) { activeTag = t; render(); }
+
+function copyPrompt(id) {
+  const e = entries.find(x=>x.id===id); if(!e) return;
+  let t = e.prompt||'';
+  if (e.negative) t += '\n\nNegative: '+e.negative;
+  if (e.note) t += '\n\nNote: '+e.note;
+  navigator.clipboard.writeText(t).then(()=>toast('提示词已复制','success'));
+}
+
+async function deleteEntry(id) {
+  if (!confirm('确定删除这条记录吗？（图片文件也会从磁盘删除）')) return;
+  const e = entries.find(x=>x.id===id);
+  if (e && e.image) await deleteImageFromDisk(e.image);
+  entries = entries.filter(x=>x.id!==id);
+  await saveIndex();
+  await render();
+  toast('已删除','success');
+}
+
+async function refreshData() {
+  toast('正在从文件夹重新加载...');
+  await loadEntries();
+  await render();
+  toast('已刷新','success');
+}
+
+// ============================================================
+//  Modal
+// ============================================================
+function openAddModal() {
+  editingId = null; pendingImage = null;
+  document.getElementById('modalTitle').textContent = '添加提示词';
+  ['entryTitle','entryPrompt','entryNeg','entryTags','entryNote'].forEach(id=>document.getElementById(id).value='');
+  resetImgArea();
+  document.getElementById('addModal').classList.add('show');
+}
+
+async function openEditModal(id) {
+  const e = entries.find(x=>x.id===id); if(!e) return;
+  editingId = id; pendingImage = null;
+  document.getElementById('modalTitle').textContent = '编辑提示词';
+  document.getElementById('entryTitle').value = e.title||'';
+  document.getElementById('entryPrompt').value = e.prompt||'';
+  document.getElementById('entryNeg').value = e.negative||'';
+  document.getElementById('entryTags').value = (e.tags||[]).join(', ');
+  document.getElementById('entryNote').value = e.note||'';
+  if (e.image) {
+    const url = await getImageBlobURL(e.image);
+    if (url) {
+      const a = document.getElementById('imgUploadArea');
+      a.innerHTML = `<img src="${url}" alt=""/>`; a.classList.add('has-image');
+    } else resetImgArea();
+  } else resetImgArea();
+  document.getElementById('addModal').classList.add('show');
+}
+
+function closeAddModal() {
+  document.getElementById('addModal').classList.remove('show');
+  editingId = null; pendingImage = null;
+}
+
+function resetImgArea() {
+  const a = document.getElementById('imgUploadArea');
+  a.innerHTML = '<div class="upload-icon">&#128444;</div><div class="upload-text">点击上传图片 (JPG / PNG / WEBP)</div>';
+  a.classList.remove('has-image');
+}
+
+function handleImageUpload(ev) {
+  const file = ev.target.files[0]; if(!file) return;
+  const ext = (file.name.split('.').pop()||'png').toLowerCase();
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    pendingImage = { file, dataUrl: e.target.result, ext };
+    const a = document.getElementById('imgUploadArea');
+    a.innerHTML = `<img src="${e.target.result}" alt=""/>`;
+    a.classList.add('has-image');
+  };
+  reader.readAsDataURL(file);
+  ev.target.value = '';
+}
+
+async function saveEntry() {
+  const title    = document.getElementById('entryTitle').value.trim();
+  const prompt   = document.getElementById('entryPrompt').value.trim();
+  const negative = document.getElementById('entryNeg').value.trim();
+  const tags     = document.getElementById('entryTags').value.trim().split(/[,，]/).map(t=>t.trim()).filter(Boolean);
+  const note     = document.getElementById('entryNote').value.trim();
+
+  if (!prompt && !pendingImage && !editingId) { toast('请至少填写提示词或上传图片','error'); return; }
+
+  showLoad(true);
+  try {
+    if (editingId) {
+      const e = entries.find(x=>x.id===editingId);
+      if (e) {
+        e.title=title; e.prompt=prompt; e.negative=negative; e.tags=tags; e.note=note; e.updated=Date.now();
+        if (pendingImage) {
+          if (e.image) await deleteImageFromDisk(e.image);
+          e.image = await saveImageToDisk(e.id, pendingImage.file, pendingImage.ext);
+        }
+      }
+      toast('已更新','success');
+    } else {
+      const id = genId();
+      let imgName = null;
+      if (pendingImage) imgName = await saveImageToDisk(id, pendingImage.file, pendingImage.ext);
+      entries.push({ id, title, prompt, negative, tags, note, image:imgName, created:Date.now(), updated:Date.now() });
+      toast('已添加','success');
+    }
+    await saveIndex();
+    closeAddModal();
+    await render();
+  } catch(e) { toast('保存失败: '+e.message,'error'); }
+  showLoad(false);
+}
+
+// ============================================================
+//  Lightbox
+// ============================================================
+async function openLightbox(id) {
+  const e = entries.find(x=>x.id===id); if(!e||!e.image) return;
+  const url = await getImageBlobURL(e.image); if(!url) return;
+  const img = document.getElementById('lbImage');
+  img.src = url;
+  let info = `<strong>${esc(e.title||'无标题')}</strong><br>${esc(e.prompt||'')}`;
+  if (e.negative) info += `<br><span style="color:var(--danger)">Neg:</span> ${esc(e.negative)}`;
+  if (e.note)     info += `<br><span style="color:var(--accent2)">Note:</span> ${esc(e.note)}`;
+  document.getElementById('lbInfo').innerHTML = info;
+  document.getElementById('lightbox').classList.add('show');
+  img.onload = () => URL.revokeObjectURL(url);
+}
+
+function closeLightbox(ev) {
+  if (ev.target===document.getElementById('lightbox')||ev.target.classList.contains('lb-close')) {
+    document.getElementById('lightbox').classList.remove('show');
+    document.getElementById('lbImage').src = '';
+  }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key==='Escape') { document.getElementById('lightbox').classList.remove('show'); closeAddModal(); }
+});
+
+// ============================================================
+//  Utils
+// ============================================================
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+function escA(s){return s.replace(/'/g,'&#39;').replace(/"/g,'&quot;');}
+function genId(){return 'e'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7);}
+
+function toast(msg,type='success'){
+  const el=document.createElement('div');el.className=`toast ${type}`;
+  el.innerHTML=`${type==='success'?'&#10003;':'&#9888;'} ${msg}`;
+  document.body.appendChild(el);
+  setTimeout(()=>{el.style.opacity='0';el.style.transition='opacity .3s';},2200);
+  setTimeout(()=>el.remove(),2700);
+}
+
+function showLoad(show){
+  let el=document.getElementById('loadingOverlay');
+  if(show){if(!el){el=document.createElement('div');el.id='loadingOverlay';el.className='loading-overlay';el.innerHTML='<div class="spinner"></div>';document.body.appendChild(el);}}
+  else{if(el)el.remove();}
+}
+
+// Search
+let sTimer;
+document.getElementById('searchInput').addEventListener('input',function(){
+  clearTimeout(sTimer);
+  sTimer=setTimeout(()=>{searchQuery=this.value.trim();render();},200);
+});
+
+// Boot
+init();
+</script>
+</body>
+</html>
